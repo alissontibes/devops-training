@@ -1,0 +1,62 @@
+# This is an example Starter pipeline configuration
+# Use a skeleton to build, test and deploy using manual and parallel steps
+# -----
+# You can specify a custom docker image from Docker Hub as your build environment.
+
+image: atlassian/default-image:3
+
+pipelines:
+  default:
+    #- parallel:
+      #- step:
+      #    name: 'Lint'
+      #    script:
+      #      - echo "Your linting goes here..."
+      - step:
+          name: 'Secret Scan'
+          script:
+            - curl -L "https://spectral-us.checkpoint.com/latest/x/sh?dsn=$SPECTRAL_DSN" | sh
+            - $HOME/.spectral/spectral scan --ok  --include-tags base,audit
+   
+      - step:
+          name: 'IaC Scan'
+          script:
+            - curl -L "https://spectral-us.checkpoint.com/latest/x/sh?dsn=$SPECTRAL_DSN" | sh
+            - $HOME/.spectral/spectral scan --ok  --include-tags iac 
+      - step:
+          name: 'Manifest Scan'
+          script:
+            - curl -L "https://spectral-us.checkpoint.com/latest/x/sh?dsn=$SPECTRAL_DSN" | sh
+            - $HOME/.spectral/spectral scan --ok  --engine-kinds packages
+            
+      - step:
+          name: 'Running Image Scan'
+          script:
+           - docker version
+           - echo "Download image and scanning..."
+           - git clone https://github.com/chkp-rolandop/demo-app
+           - docker build -t alissoncp/myapp ./demo-app
+           - docker save -o myapp.tar alissoncp/myapp
+           - curl -L 'https://shiftleft-prod-bucket.sg.iaas.checkpoint.com/blades/shiftleft/bin/linux/amd64/0.0.36/shiftleft' --output shiftleft
+           - chmod +x shiftleft
+           - cp shiftleft ~/bin
+           - echo "Scanning with ShiftLeft"
+           - ./shiftleft image-scan -r -2002 -i myapp.tar
+             #./shiftleft image-scan -i myapp.tar -e $CHKP_CLOUDGUARD_ID
+           - echo .
+          services:
+            - docker      
+
+           
+    # The following deployment steps will be executed for each pipeline run. To configure your steps and conditionally deploy see https://support.atlassian.com/bitbucket-cloud/docs/configure-bitbucket-pipelinesyml/
+  #  - step:
+   #     name: 'Deployment to Staging'
+    #    deployment: staging
+     #   script:
+      #    - echo "Your deployment to staging script goes here..."
+    #- step:
+     #   name: 'Deployment to Production'
+      #  deployment: production
+       # trigger: 'manual'
+        #script:
+         # - echo "Your deployment to production script goes here..."
